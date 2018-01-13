@@ -9,8 +9,8 @@ extern AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x);
 extern AD<double> polyeval_dot(Eigen::VectorXd coeffs, AD<double> x);
 
 // TODO: Set the timestep length and duration
-size_t N = 40;
-double dt = 0.15;
+size_t N = 50;
+double dt = 0.12;
 int x_start = 0;
 int y_start = x_start + N;
 int psi_start = y_start + N;
@@ -32,8 +32,8 @@ int a_end = a_start + N-1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double v_ref = 12;
-const double a_factor = 1;
+const double v_ref = 15;
+const double a_factor = 4;
 
 class FG_eval {
  public:
@@ -62,7 +62,7 @@ class FG_eval {
     for (unsigned int t = 0; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
       AD<double> a = vars[a_start + t] * a_factor;
-      fg[0] += CppAD::pow(delta, 2);
+      fg[0] += 4*CppAD::pow(delta, 2);
       fg[0] += 10*CppAD::pow(a, 2);
     }
     for (unsigned int t = 1; t < N-1; t++) {
