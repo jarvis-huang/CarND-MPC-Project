@@ -63,7 +63,7 @@ class FG_eval {
       AD<double> delta = vars[delta_start + t];
       AD<double> a = vars[a_start + t] * a_factor;
       fg[0] += 2*CppAD::pow(delta, 2);
-      fg[0] += 20*CppAD::pow(a, 2);
+      fg[0] += 5*CppAD::pow(a, 2);
     }
     for (unsigned int t = 1; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
