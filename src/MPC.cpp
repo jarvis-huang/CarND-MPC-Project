@@ -32,8 +32,8 @@ int a_end = a_start + N-1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double v_ref = 10;
-const double a_factor = 4;
+const double v_ref = 12;
+const double a_factor = 1;
 
 class FG_eval {
  public:
@@ -57,13 +57,13 @@ class FG_eval {
       AD<double> epsi = vars[epsi_start + t];
       fg[0] += CppAD::pow(cte, 2);
       fg[0] += CppAD::pow(epsi, 2);
-      fg[0] += CppAD::pow(v-v_ref, 2);
+      fg[0] += 0.5*CppAD::pow(v-v_ref, 2);
     }
     for (unsigned int t = 0; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
       AD<double> a = vars[a_start + t] * a_factor;
-      fg[0] += 2*CppAD::pow(delta, 2);
-      fg[0] += 5*CppAD::pow(a, 2);
+      fg[0] += CppAD::pow(delta, 2);
+      fg[0] += 10*CppAD::pow(a, 2);
     }
     for (unsigned int t = 1; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
@@ -71,7 +71,7 @@ class FG_eval {
       AD<double> delta_prev = vars[delta_start + t - 1];
       AD<double> a_prev = vars[a_start + t - 1] * a_factor;
       // Smooth out control
-      fg[0] += 20*CppAD::pow(delta-delta_prev, 2);
+      fg[0] += 50*CppAD::pow(delta-delta_prev, 2);
       fg[0] += CppAD::pow(a-a_prev, 2);
     }
     // Initial states
