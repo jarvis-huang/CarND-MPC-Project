@@ -33,7 +33,7 @@ int a_end = a_start + N-1;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 const double v_ref = 25;
-const double a_factor = 1;
+const double speed_factor = 0.44704; // mph->m/s
 
 class FG_eval {
  public:
@@ -61,15 +61,15 @@ class FG_eval {
     }
     for (unsigned int t = 0; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
-      AD<double> a = vars[a_start + t] * a_factor;
+      AD<double> a = vars[a_start + t];
       fg[0] += 80*CppAD::pow(delta, 2);
       fg[0] += 80*CppAD::pow(a, 2);
     }
     for (unsigned int t = 1; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
-      AD<double> a = vars[a_start + t] * a_factor;
+      AD<double> a = vars[a_start + t];
       AD<double> delta_prev = vars[delta_start + t - 1];
-      AD<double> a_prev = vars[a_start + t - 1] * a_factor;
+      AD<double> a_prev = vars[a_start + t - 1];
       // Smooth out control
       fg[0] += 100*CppAD::pow(delta-delta_prev, 2);
       fg[0] += 100*CppAD::pow(a-a_prev, 2);
@@ -89,18 +89,18 @@ class FG_eval {
       AD<double> x = vars[x_start + t];
       AD<double> y = vars[y_start + t];
       AD<double> psi = vars[psi_start + t];
-      AD<double> v = vars[v_start + t]*0.44704; // mph->m/s
+      AD<double> v = vars[v_start + t] * speed_factor;
       AD<double> cte = vars[cte_start + t];
       AD<double> epsi = vars[epsi_start + t];
             
       AD<double> x0 = vars[x_start + t -1];
       AD<double> y0 = vars[y_start + t -1];
       AD<double> psi0 = vars[psi_start + t -1];
-      AD<double> v0 = vars[v_start + t -1]*0.44704; // mph->m/s
+      AD<double> v0 = vars[v_start + t -1] * speed_factor; 
       AD<double> cte0 = vars[cte_start + t-1];
       AD<double> epsi0 = vars[epsi_start + t-1];      
       AD<double> delta0 = vars[delta_start + t -1];
-      AD<double> a0 = vars[a_start + t -1]*0.44704*a_factor; // mph->m/s
+      AD<double> a0 = vars[a_start + t -1] * speed_factor;
       
       AD<double> y_ref = polyeval(coeffs, x0);
       AD<double> psi_ref = CppAD::atan(polyeval_dot(coeffs, x0));
@@ -249,5 +249,5 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   for (unsigned int t = 1; t < N; t++) {
       ret.push_back(solution.x[y_start+t]);
   }
-  return ret;
+  return ret; // return [next steering, next throttle, next (N-1) * x, next (N-1) * y]
 }

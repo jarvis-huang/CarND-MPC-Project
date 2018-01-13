@@ -132,7 +132,7 @@ int main() {
           */
 
           Eigen::Vector4d state; // JHUANG: why VectorXd fails ??
-          state << 0, 0, 0.0, v;
+          state << 0, 0, 0.0, v; // after transform, ego pos and orientation is 0.
           //std::cout << "veh= (" << 0 << ", " << 0 <<  ", " << 0 << ", " << v << ")" << std::endl;
           Eigen::VectorXd coeffs = polyfit(eig_pts.row(0), eig_pts.row(1), 3);
           //std::cout << coeffs << std::endl;
