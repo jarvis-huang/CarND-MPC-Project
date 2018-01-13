@@ -6,11 +6,14 @@
 #include <vector>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
+#include "Eigen-3.3/Eigen/Dense"
 #include "MPC.h"
 #include "json.hpp"
+#include <cppad/cppad.hpp>
 
 // for convenience
 using json = nlohmann::json;
+using CppAD::AD;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -33,10 +36,19 @@ string hasData(string s) {
 }
 
 // Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
+AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x) {
+  AD<double> result = 0.0;
   for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
+    result += coeffs[i] * CppAD::pow(x, i);
+  }
+  return result;
+}
+
+// Evaluate a polynomial derivative.
+AD<double> polyeval_dot(Eigen::VectorXd coeffs, AD<double> x) {
+  AD<double> result = 0.0;
+  for (int i = 1; i < coeffs.size(); i++) {
+    result += coeffs[i] * i * CppAD::pow(x, i-1);
   }
   return result;
 }
@@ -70,6 +82,7 @@ int main() {
 
   // MPC is initialized here!
   MPC mpc;
+  std::cout << "mpc initialized" << std::endl;
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -77,13 +90,15 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
         auto j = json::parse(s);
         string event = j[0].get<string>();
         if (event == "telemetry") {
+          std::cout << "---" << std::endl;
+          
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
@@ -91,25 +106,62 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-
+          
+          // Transform waypoints from global frame to vehicle frame
+          Eigen::MatrixXd eig_pts(2,ptsx.size());
+          //std::cout << "ref path (global) = " << std::endl;
+          for (unsigned int k=0; k<ptsx.size(); k++) {
+              eig_pts(0, k) = ptsx[k];
+              eig_pts(1, k) = ptsy[k];
+              //std::cout << "(" << ptsx[k] << ", " << ptsy[k] << ")" << std::endl;
+          }
+          Eigen::Vector2d trans;
+          trans << px, py;
+          eig_pts.colwise() -= trans;
+          Eigen::Matrix2d rot;
+          rot << cos(psi), -sin(psi), sin(psi), cos(psi);
+          eig_pts = rot.inverse() * eig_pts;
+          //std::cout << "ref path (local) = " << std::endl;
+          //std::cout << eig_pts << std::endl;
+          
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+
+          Eigen::Vector4d state; // JHUANG: why VectorXd fails ??
+          state << 0, 0, 0.0, v;
+          //std::cout << "veh= (" << 0 << ", " << 0 <<  ", " << 0 << ", " << v << ")" << std::endl;
+          Eigen::VectorXd coeffs = polyfit(eig_pts.row(0), eig_pts.row(1), 3);
+          std::cout << coeffs << std::endl;
+          //std::cout << "before mpc solve" << std::endl;
+          vector<double> sol = mpc.Solve(state, coeffs);
+          //std::cout << "after mpc solve" << std::endl;
+          double steer_value = sol[0]/deg2rad(25);
+          double throttle_value = sol[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
+          std::cout << "steer, throttle=" << steer_value << ", " << throttle_value << std::endl;
 
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
+          int N = (sol.size() - 2) / 2;
+          //std::cout << "MPC path = " << std::endl;
+          for (int k=0; k<N; k++) {
+              double mpc_x = sol[2+k];
+              double mpc_y = sol[2+N+k];
+              
+            mpc_x_vals.push_back(mpc_x);
+            mpc_y_vals.push_back(mpc_y);
+            //std::cout << "(" << mpc_x << ", " << mpc_y << ")" << std::endl;
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -120,6 +172,12 @@ int main() {
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
+          for (unsigned int k=0; k<eig_pts.cols(); k++) {
+              next_x_vals.push_back(eig_pts(0, k));
+              next_y_vals.push_back(eig_pts(1, k));
+          }
+          //std::cout << "ptsx=" << ptsx << std::endl;
+          //std::cout << "ptsy=" << ptsy << std::endl;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
@@ -129,7 +187,8 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
+          
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.

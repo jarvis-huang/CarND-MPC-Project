@@ -9,15 +9,13 @@ extern AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x);
 extern AD<double> polyeval_dot(Eigen::VectorXd coeffs, AD<double> x);
 
 // TODO: Set the timestep length and duration
-size_t N = 30;
-double dt = 0.1;
+size_t N = 20;
+double dt = 0.05;
 int x_start = 0;
 int y_start = x_start + N;
 int psi_start = y_start + N;
 int v_start = psi_start + N;
-int cte_start = v_start + N;
-int epsi_start = cte_start + N;
-int delta_start = epsi_start + N;
+int delta_start = v_start + N;
 int a_start = delta_start + N-1;
 int a_end = a_start + N-1;
 
@@ -32,7 +30,7 @@ int a_end = a_start + N-1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double v_ref = 12;
+const double v_ref = 10;
 
 class FG_eval {
  public:
@@ -52,25 +50,25 @@ class FG_eval {
       AD<double> y = vars[y_start + t];
       AD<double> psi = vars[psi_start + t];
       AD<double> v = vars[v_start + t];
-      AD<double> cte = vars[cte_start + t];
-      AD<double> epsi = vars[epsi_start + t];
+      AD<double> y_ref = polyeval(coeffs, x);
+      AD<double> cte = y - y_ref;
       fg[0] += CppAD::pow(cte, 2);
-      fg[0] += CppAD::pow(epsi, 2);
+      AD<double> psi_ref = CppAD::atan(polyeval_dot(coeffs, x));
+      fg[0] += CppAD::pow(psi-psi_ref, 2);
       fg[0] += CppAD::pow(v-v_ref, 2);
     }
     for (unsigned int t = 0; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
       AD<double> a = vars[a_start + t];
       fg[0] += CppAD::pow(delta, 2);
-      fg[0] += 10*CppAD::pow(a, 2);
+      fg[0] += CppAD::pow(a, 2);
     }
     for (unsigned int t = 1; t < N-1; t++) {
       AD<double> delta = vars[delta_start + t];
       AD<double> a = vars[a_start + t];
       AD<double> delta_prev = vars[delta_start + t - 1];
       AD<double> a_prev = vars[a_start + t - 1];
-      // Smooth out control
-      fg[0] += 10*CppAD::pow(delta-delta_prev, 2);
+      fg[0] += CppAD::pow(delta-delta_prev, 2);
       fg[0] += CppAD::pow(a-a_prev, 2);
     }
     // Initial states
@@ -78,8 +76,6 @@ class FG_eval {
     fg[1 + y_start] = vars[y_start];
     fg[1 + psi_start] = vars[psi_start];
     fg[1 + v_start] = vars[v_start];
-    fg[1 + cte_start] = vars[cte_start];
-    fg[1 + epsi_start] = vars[epsi_start];    
     // JHUANG: why don't need these two??
     //fg[1 + delta_start] = vars[delta_start];
     //fg[1 + a_start] = vars[a_start];
@@ -88,29 +84,19 @@ class FG_eval {
       AD<double> x = vars[x_start + t];
       AD<double> y = vars[y_start + t];
       AD<double> psi = vars[psi_start + t];
-      AD<double> v = vars[v_start + t]*0.44704; // mph->m/s
-      AD<double> cte = vars[cte_start + t];
-      AD<double> epsi = vars[epsi_start + t];
-            
+      AD<double> v = vars[v_start + t];
+      
       AD<double> x0 = vars[x_start + t -1];
       AD<double> y0 = vars[y_start + t -1];
       AD<double> psi0 = vars[psi_start + t -1];
-      AD<double> v0 = vars[v_start + t -1]*0.44704; // mph->m/s
-      AD<double> cte0 = vars[cte_start + t-1];
-      AD<double> epsi0 = vars[epsi_start + t-1];      
+      AD<double> v0 = vars[v_start + t -1];
       AD<double> delta0 = vars[delta_start + t -1];
-      AD<double> a0 = vars[a_start + t -1]*0.44704; // mph->m/s
-      
-      AD<double> y_ref = polyeval(coeffs, x0);
-      AD<double> psi_ref = CppAD::atan(polyeval_dot(coeffs, x0));
+      AD<double> a0 = vars[a_start + t -1];
       
       fg[x_start + t + 1] = x - (x0 + v0*CppAD::cos(psi0)*dt);
       fg[y_start + t + 1] = y - (y0 + v0*CppAD::sin(psi0)*dt);
-      // steering<0 == left == increase psi, therefore negate steering here
-      fg[psi_start + t + 1] = psi - (psi0 - v0 / Lf * delta0  * dt);
+      fg[psi_start + t + 1] = psi - (psi0 + v0 / Lf * delta0 * dt);
       fg[v_start + t +1] = v - (v0 + a0*dt);
-      fg[cte_start + t+1] = cte - (y0 - y_ref + v0 * CppAD::sin(epsi0) * dt);
-      fg[epsi_start + t+1] = epsi - (psi0 - psi_ref - v0 / Lf * delta0 * dt);
     }
           
   }
@@ -127,14 +113,16 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
   
+  std::cout << "inside solve" << std::endl;
+
   // TODO: Set the number of model variables (includes both states and inputs).
   // For example: If the state is a 4 element vector, the actuators is a 2
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 6*N + 2*(N-1);
+  size_t n_vars = 4*N + 2*(N-1);
   // TODO: Set the number of constraints
-  size_t n_constraints = 6*N;
+  size_t n_constraints = 4*N;
 
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
@@ -142,22 +130,16 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   double y = state[1];
   double psi = state[2];
   double v = state[3];
-  double cte = y - CppAD::Value(polyeval(coeffs, x));
-  double epsi = psi - atan(CppAD::Value(polyeval_dot(coeffs, x)));
-  // normalize to (-pi/2, pi/2)
-  while (epsi > M_PI/2) epsi -= M_PI;
-  while (epsi < -M_PI/2) epsi += M_PI;
+  
   
   Dvector vars(n_vars);
-  for (i = 0; i < n_vars; i++) {
+  for (unsigned int i = 0; i < n_vars; i++) {
     vars[i] = 0;
   }
   vars[x_start] = x;
   vars[y_start] = y;
   vars[psi_start] = psi;
   vars[v_start] = v;
-  vars[cte_start] = cte;
-  vars[epsi_start] = epsi;
   
 
   Dvector vars_lowerbound(n_vars);
@@ -180,7 +162,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // Should be 0 besides initial state.
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
-  for (i = 0; i < n_constraints; i++) {
+  for (unsigned int i = 0; i < n_constraints; i++) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
@@ -188,14 +170,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_lowerbound[y_start] = y;
   constraints_lowerbound[psi_start] = psi;
   constraints_lowerbound[v_start] = v;
-  constraints_lowerbound[cte_start] = cte;
-  constraints_lowerbound[epsi_start] = epsi;  
   constraints_upperbound[x_start] = x;
   constraints_upperbound[y_start] = y;
   constraints_upperbound[psi_start] = psi;
   constraints_upperbound[v_start] = v;  
-  constraints_upperbound[cte_start] = cte;
-  constraints_upperbound[epsi_start] = epsi; 
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);
@@ -247,6 +225,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   }
   for (unsigned int t = 1; t < N; t++) {
       ret.push_back(solution.x[y_start+t]);
-  }
+  }  
   return ret;
 }
