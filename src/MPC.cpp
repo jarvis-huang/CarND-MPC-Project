@@ -70,7 +70,7 @@ class FG_eval {
       AD<double> delta_prev = vars[delta_start + t - 1];
       AD<double> a_prev = vars[a_start + t - 1];
       // Smooth out control
-      fg[0] += 10*CppAD::pow(delta-delta_prev, 2);
+      fg[0] += 20*CppAD::pow(delta-delta_prev, 2);
       fg[0] += CppAD::pow(a-a_prev, 2);
     }
     // Initial states

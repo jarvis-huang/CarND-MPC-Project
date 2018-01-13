@@ -135,7 +135,7 @@ int main() {
           state << 0, 0, 0.0, v;
           //std::cout << "veh= (" << 0 << ", " << 0 <<  ", " << 0 << ", " << v << ")" << std::endl;
           Eigen::VectorXd coeffs = polyfit(eig_pts.row(0), eig_pts.row(1), 3);
-          std::cout << coeffs << std::endl;
+          //std::cout << coeffs << std::endl;
           //std::cout << "before mpc solve" << std::endl;
           vector<double> sol = mpc.Solve(state, coeffs);
           //std::cout << "after mpc solve" << std::endl;
