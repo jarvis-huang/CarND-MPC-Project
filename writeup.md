@@ -31,7 +31,7 @@ The update equations are basically constant acceleration and turn rate equations
 - For smooth control and trajectory, I used large weights for actuations and actuation derivatives in the cost function.
 
 ## Screenshots
-![1](pic/1.png "1")
-![2](pic/2.png "2")
-![3](pic/3.png "3")
-![4](pic/4.png "4")
+![1](pic/1.png )
+![2](pic/2.png )
+![3](pic/3.png )
+![4](pic/4.png )
