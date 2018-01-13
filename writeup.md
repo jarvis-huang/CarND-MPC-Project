@@ -14,7 +14,6 @@ My cost function includes `cte`, `epsi`, v error, control input magnitude and co
 The update equations are basically constant acceleration and turn rate equations.
 
 
-
 ## Changes
 - In order to calculate reference heading angle, I implemented a function `polyeval_dot` which calculates the first derivative of a polynomial.
 - Because velocity is measured in mph but distance in meter, I need to convert velocity to m/s by multiplying a factor of 0.44704. Similarly for acceleration.
@@ -30,3 +29,9 @@ The update equations are basically constant acceleration and turn rate equations
   
 - For MPC parameters, I chose N = 50, dt = 0.1. This translates to 5s of time horizon. And N=50 is not too computationally intensive.
 - For smooth control and trajectory, I used large weights for actuations and actuation derivatives in the cost function.
+
+## Screenshots
+![1](pic/1.png "1")
+![2](pic/2.png "2")
+![3](pic/3.png "3")
+![4](pic/4.png "4")
