@@ -32,6 +32,9 @@ Polynomial fitting is done with 3rd-order polynomial using `polyfit` function.
 - For MPC parameters, I chose N = 50, dt = 0.1. This translates to 5s of time horizon. And N=50 is not too computationally intensive. Choosing too large N will slow down ipopt. Choosing too small N will cause a very small look-ahead trajectory and will not be able to anticipate sharp curvatures ahead of time.
 - For smooth control and trajectory, I used large weights for actuations and actuation derivatives in the cost function.
 
+## Latency compensation
+As per reviewer's advice, I added control latency compensation code. This is done inside `main.cpp` by extrapolating the current vehicle position `px`, `py` into the future. We can simply assume the vehicle maintains its heading `psi` and velocity `v`. All we need is the extrapolating `dt`. I calculate `dt` by computing the difference between the last control timestamp and the last sensor input timestamp. This also includes MPC code's optimization algorithm. It turns out to be around 140ms. Then the new predicted future `px`, `py` are used to initialize the MPC for this iteration. The result appears slightly smoother than before.
+
 ## Screenshots
 ![1](pic/1.png )
 ![2](pic/2.png )

@@ -15,6 +15,8 @@
 using json = nlohmann::json;
 using CppAD::AD;
 
+const double speed_factor = 0.44704; // mph->m/s
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -89,6 +91,7 @@ int main() {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
+    static std::chrono::duration<double> t_diff (0); // latency
     string sdata = string(data).substr(0, length);
     //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
@@ -100,12 +103,18 @@ int main() {
           std::cout << "---" << std::endl;
           
           // j[1] is the data JSON object
+          auto t_start = std::chrono::system_clock::now();
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          
+          // Predict (x, y) in the future 100ms to account for control latency
+          px += v*speed_factor*cos(psi)*t_diff.count();
+          py += v*speed_factor*sin(psi)*t_diff.count();
+          std::cout << "latency=" << t_diff.count() << std::endl;
           
           // Transform waypoints from global frame to vehicle frame
           Eigen::MatrixXd eig_pts(2,ptsx.size());
@@ -199,6 +208,8 @@ int main() {
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
           this_thread::sleep_for(chrono::milliseconds(100));
+          auto t_end = std::chrono::system_clock::now();
+          t_diff = t_end - t_start;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
