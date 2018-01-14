@@ -13,6 +13,8 @@ My cost function includes `cte`, `epsi`, v error, control input magnitude and co
 
 The update equations are basically constant acceleration and turn rate equations.
 
+Polynomial fitting is done with 3rd-order polynomial using `polyfit` function.
+
 
 ## Changes
 - In order to calculate reference heading angle, I implemented a function `polyeval_dot` which calculates the first derivative of a polynomial.
@@ -27,7 +29,7 @@ The update equations are basically constant acceleration and turn rate equations
   ```
   Here `R` and `T` are rotation and translation from global to local coordinates. They can be readily computed from px, py and psi.
   
-- For MPC parameters, I chose N = 50, dt = 0.1. This translates to 5s of time horizon. And N=50 is not too computationally intensive.
+- For MPC parameters, I chose N = 50, dt = 0.1. This translates to 5s of time horizon. And N=50 is not too computationally intensive. Choosing too large N will slow down ipopt. Choosing too small N will cause a very small look-ahead trajectory and will not be able to anticipate sharp curvatures ahead of time.
 - For smooth control and trajectory, I used large weights for actuations and actuation derivatives in the cost function.
 
 ## Screenshots
@@ -35,3 +37,5 @@ The update equations are basically constant acceleration and turn rate equations
 ![2](pic/2.png )
 ![3](pic/3.png )
 ![4](pic/4.png )
+
+## Video recording
