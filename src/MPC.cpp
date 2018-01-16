@@ -9,7 +9,7 @@ extern AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x);
 extern AD<double> polyeval_dot(Eigen::VectorXd coeffs, AD<double> x);
 
 // TODO: Set the timestep length and duration
-size_t N = 50;
+size_t N = 20;
 double dt = 0.1;
 int x_start = 0;
 int y_start = x_start + N;

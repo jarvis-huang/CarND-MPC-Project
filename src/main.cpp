@@ -92,6 +92,9 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     static std::chrono::duration<double> t_diff (0); // latency
+    static double steer_value = 0;
+    static double throttle_value = 0;
+    const double Lf = 2.67;
     string sdata = string(data).substr(0, length);
     //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
@@ -114,6 +117,8 @@ int main() {
           // Predict (x, y) in the future 100ms to account for control latency
           px += v*speed_factor*cos(psi)*t_diff.count();
           py += v*speed_factor*sin(psi)*t_diff.count();
+          psi += steer_value*deg2rad(25)*v/Lf*t_diff.count();
+          v += throttle_value*speed_factor*t_diff.count();
           std::cout << "latency=" << t_diff.count() << std::endl;
           
           // Transform waypoints from global frame to vehicle frame
@@ -148,8 +153,8 @@ int main() {
           //std::cout << "before mpc solve" << std::endl;
           vector<double> sol = mpc.Solve(state, coeffs);
           //std::cout << "after mpc solve" << std::endl;
-          double steer_value = sol[0]/deg2rad(25);
-          double throttle_value = sol[1];
+          steer_value = sol[0]/deg2rad(25);
+          throttle_value = sol[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
